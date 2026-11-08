@@ -1,0 +1,28 @@
+# 1. 敏感資訊檔 / 設定檔
+.env
+config.json
+*.json
+
+# 2. Python 快取與環境
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# 3. 日誌與資料庫
+.log
+.db
+.sqlite3
+*.log
+
+# 4. 作業系統產生的暫存檔
+.DS_Store
+Thumbs.db   
+
+# 5. 資料檔
+*.csv
+.xlsx
+.xls
+*.png
+chrome_profile/
+screenshots/
