@@ -1,5 +1,6 @@
 # 1. 敏感資訊檔 / 設定檔
 .env
+*.env
 config.json
 *.json
 
