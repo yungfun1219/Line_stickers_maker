@@ -1,58 +1,59 @@
+import os
 import cv2
 import numpy as np
-import os
 from PIL import Image
 
-# 1. 讀取圖片
-image_path = '2026-11-08.png'  # 請替換為你的圖片檔案名稱
-img = cv2.imread(image_path)
-gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+# 取得目前執行程式所在的絕對目錄
+current_dir = os.path.dirname(os.path.abspath(__file__))
+image_path = os.path.join(current_dir, 'IMG_8842.JPG')
 
-# 2. 影像二值化與形態學處理（找出貼圖主體與背景的界線）
-# 假設背景是淺色系，利用反轉閾值抓出深色的貼圖主體
-_, thresh = cv2.threshold(gray, 235, 255, cv2.THRESH_BINARY_INV)
+if not os.path.exists(image_path):
+  raise FileNotFoundError(f'找不到圖片檔案: {image_path}')
 
-# 進行閉運算（Closing），將貼圖內部的碎塊與周圍裝飾字連成一個完整的區塊
-kernel = np.ones((15, 15), np.uint8)
-closing = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=2)
+# 讀取圖片 (支援中文路徑)
+img = cv2.imdecode(np.fromfile(image_path, dtype=np.uint8), cv2.IMREAD_COLOR)
+if img is None:
+  raise FileNotFoundError(f'無法成功解析圖片: {image_path}')
 
-# 3. 尋找所有獨立的貼圖輪廓
-contours, _ = cv2.findContours(closing, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+img_h, img_w, _ = img.shape
 
-output_dir = 'smart_line_stickers'
+# 建立輸出資料夾
+output_dir = os.path.join(current_dir, 'smart_line_stickers')
 os.makedirs(output_dir, exist_ok=True)
 
-bounding_boxes = []
-for c in contours:
-    x, y, w, h = cv2.boundingRect(c)
-    # 過濾掉太小的雜訊或佔滿全圖的大框
-    if w > 80 and h > 80 and w < img.shape[1] * 0.95 and h < img.shape[0] * 0.95:
-        bounding_boxes.append((x, y, w, h))
+# 16方格為 4欄 x 4列
+cols = 4
+rows = 4
 
-# 4. 依照排版位置排序（先由上到下分行，再由左到右排序）
-# 這裡以大約的行高分群
-bounding_boxes = sorted(bounding_boxes, key=lambda b: (b[1] // 120, b[0]))
+cell_w = img_w / cols
+cell_h = img_h / rows
 
-# 5. 進行智慧裁切與邊距微調
-for i, (x, y, w, h) in enumerate(bounding_boxes):
-    # 設定安全邊距 (Padding)，避免切到外框或特效字
-    padding = 10
-    x_start = max(0, x - padding)
-    y_start = max(0, y - padding)
-    x_end = min(img.shape[1], x + w + padding)
-    y_end = min(img.shape[0], y + h + padding)
+sticker_count = 0
 
-    # 裁切區域
+# 迴圈切出每一格
+for r in range(rows):
+  for c in range(cols):
+    sticker_count += 1
+
+    # 計算每一格的精確座標
+    x_start = int(c * cell_w)
+    y_start = int(r * cell_h)
+    x_end = int((c + 1) * cell_w)
+    y_end = int((r + 1) * cell_h)
+
+    # 裁切格子
     sticker = img[y_start:y_end, x_start:x_end]
 
-    # 轉換色彩並用 Pillow 調整為 LINE 貼圖標準尺寸 (最大 370x320)
+    # 色彩轉換並用 Pillow 調整為 LINE 貼圖標準尺寸 (最大 370x320)
     sticker_rgb = cv2.cvtColor(sticker, cv2.COLOR_BGR2RGB)
     pil_img = Image.fromarray(sticker_rgb)
     pil_img.thumbnail((370, 320), Image.Resampling.LANCZOS)
 
     # 儲存圖片
-    output_path = os.path.join(output_dir, f'smart_sticker_{i+1:02d}.png')
+    output_path = os.path.join(
+        output_dir, f'smart_sticker_{sticker_count:02d}.png'
+    )
     pil_img.save(output_path, 'PNG')
-    print(f'已智慧裁切並儲存: {output_path}')
+    print(f'已裁切第 {sticker_count} 張貼圖並儲存: {output_path}')
 
-print('所有貼圖智慧裁切完成！')
+print('16 方格貼圖全部裁切完成！')
